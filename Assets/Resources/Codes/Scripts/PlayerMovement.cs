@@ -18,7 +18,7 @@ public class PlayerMovement : MonoBehaviour
     public LayerMask groundMask;
 
     private CharacterController controller;
-    private Vector3 velocity;
+    public Vector3 velocity;
     private bool isGrounded;
 
     private Animator animator;
