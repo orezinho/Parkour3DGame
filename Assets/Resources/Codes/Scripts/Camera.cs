@@ -7,6 +7,8 @@ public class CameraFollowHead : MonoBehaviour
     public float followStrength = 0.3f; 
     public float smooth = 10f;
 
+    public PlayerMovement player;
+
     private Vector3 offset;
 
     void Start()
@@ -18,6 +20,8 @@ public class CameraFollowHead : MonoBehaviour
     {
         Vector3 targetPos = headBone.position;
         Quaternion targetRot = headBone.rotation;
+
+
 
         cam.position = Vector3.Lerp(cam.position, targetPos, Time.deltaTime * smooth);
 

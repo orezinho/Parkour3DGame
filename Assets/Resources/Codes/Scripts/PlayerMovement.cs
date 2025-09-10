@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController))]
@@ -21,6 +22,8 @@ public class PlayerMovement : MonoBehaviour
     public Vector3 velocity;
     private bool isGrounded;
 
+    public bool isClimbing = false;
+
     private Animator animator;
 
     void Start()
@@ -42,6 +45,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump()
     {
+        if (isClimbing && Input.GetButtonDown("Jump"))
+        {
+            StartCoroutine(ExitLadder());
+            isClimbing = false;
+            return;
+        }
+
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
@@ -51,10 +61,25 @@ public class PlayerMovement : MonoBehaviour
         animator.SetBool("isGrounded", isGrounded);
     }
 
+    private IEnumerator ExitLadder()
+    {
+        float elapsed = 0f;
+        float duration = 0.5f;
+
+        while (elapsed < duration)
+        {
+            controller.Move(-transform.forward * 3f * Time.deltaTime);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+    }
+
     private void PlayerMove()
     {
         isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
         if (isGrounded && velocity.y < 0) velocity.y = -2f;
+
+        if (isClimbing) return;
 
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
@@ -78,6 +103,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void ApplyGravity()
     {
+        if (isClimbing) return;
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
     }
@@ -94,6 +120,22 @@ public class PlayerMovement : MonoBehaviour
 
         animator.SetBool("isRunning", isRunning);
         animator.SetBool("isWalking", isWalking && !isRunning);
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Stairs")) 
+        {
+            isClimbing = true;
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Stairs"))
+        {
+            isClimbing = false;
+        }
     }
 
 }
