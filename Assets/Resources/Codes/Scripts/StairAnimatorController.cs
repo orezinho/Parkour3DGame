@@ -43,7 +43,8 @@ public class StairClimbing : MonoBehaviour
             animator.speed = 1f;
         }
 
-        controller.Move((move + new Vector3(0, velocity.y, 0)) * Time.deltaTime);
+        if (controller.enabled)
+            controller.Move((move + new Vector3(0, velocity.y, 0)) * Time.deltaTime);
     }
 
     private void OnTriggerEnter(Collider other)
