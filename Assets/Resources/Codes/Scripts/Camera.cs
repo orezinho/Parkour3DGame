@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class CameraFollowHead : MonoBehaviour
+public class FirstCamera : MonoBehaviour
 {
     public Transform headBone;
     public Transform cam;        
@@ -20,8 +20,6 @@ public class CameraFollowHead : MonoBehaviour
     {
         Vector3 targetPos = headBone.position;
         Quaternion targetRot = headBone.rotation;
-
-
 
         cam.position = Vector3.Lerp(cam.position, targetPos, Time.deltaTime * smooth);
 

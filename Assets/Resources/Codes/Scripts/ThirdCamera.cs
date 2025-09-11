@@ -1,38 +1,37 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-public class ThirdPersonCameraCollision : MonoBehaviour
+public class ThirdPersonCamera : MonoBehaviour
 {
     [Header("Alvo / Pivot")]
-    public Transform target;                 // normalmente um empty nas costas/cabeça do player
+    public Transform target;                
     public Vector3 pivotOffset = new Vector3(0f, 1.6f, 0f);
 
     [Header("Órbita / Input (opcional)")]
     public bool useMouseOrbit = true;
-    public float mouseXSensitivity = 180f;   // graus/segundo
-    public float mouseYSensitivity = 120f;   // graus/segundo
-    public float minPitch = -30f;            // olhar para baixo
-    public float maxPitch = 70f;             // olhar para cima
+    public float minPitch = -30f;         
+    public float maxPitch = 70f;             
 
     [Header("Distância / Zoom")]
-    public float defaultDistance = 3.5f;     // distância “ideal”
-    public float minDistance = 0.3f;         // quão perto pode chegar do pivô
-    public float maxDistance = 6f;           // limite de zoom para trás
-    public float zoomSpeed = 5f;             // com scroll do mouse
+    public float defaultDistance = 3.5f;    
+    public float minDistance = 0.3f;        
+    public float maxDistance = 6f;          
+    public float zoomSpeed = 5f;             
 
     [Header("Colisão")]
-    public float sphereRadius = 0.25f;       // “gordura” do cast (cobre cantos próximos)
-    public float clipPushback = 0.05f;       // folga do obstáculo
-    public LayerMask obstructionMask = ~0;   // defina para ignorar Player
+    public float sphereRadius = 0.25f;      
+    public float clipPushback = 0.05f;       
+    public LayerMask obstructionMask = ~0;   
 
     [Header("Suavização")]
-    public float positionSmoothTime = 0.05f; // suaviza encurtar/voltar distância
-    public float rotationSmoothTime = 0.02f; // suaviza rotação
+    public float positionSmoothTime = 0.05f; 
+    public float rotationSmoothTime = 0.02f; 
 
-    // estado interno
-    float yaw;      // rotação em Y (horizontal)
-    float pitch;    // rotação em X (vertical)
-    float currentDistance;
-    float distVel;  // ref do SmoothDamp
+    float yaw;      
+    float pitch;    
+    public float currentDistance;
+    float distVel; 
+    public PlayerMovement player;
     Quaternion currentRot, rotVel;
 
     void Start()
@@ -43,7 +42,6 @@ public class ThirdPersonCameraCollision : MonoBehaviour
             enabled = false; return;
         }
 
-        // inicializa rotação olhando do alvo para a câmera atual
         Vector3 toCam = (transform.position - (target.position + pivotOffset));
         if (toCam.sqrMagnitude > 0.0001f)
         {
@@ -59,24 +57,32 @@ public class ThirdPersonCameraCollision : MonoBehaviour
 
     void Update()
     {
-        // Zoom por scroll (opcional)
-        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        // Zoom
+        float scroll = Input.mouseScrollDelta.y;
         if (Mathf.Abs(scroll) > 0.0001f)
         {
             defaultDistance = Mathf.Clamp(defaultDistance - scroll * zoomSpeed, minDistance, maxDistance);
         }
 
-        // Órbita por mouse (opcional)
         if (useMouseOrbit)
         {
-            float mx = Input.GetAxis("CameraHorizontal");
-            float my = -Input.GetAxis("CameraVertical");
+            Vector2 lookInput = Vector2.zero;
 
-            yaw += mx * mouseXSensitivity * Time.deltaTime;
-            pitch += my * mouseYSensitivity * Time.deltaTime;
+            if (Gamepad.current != null)
+            {
+                lookInput = Gamepad.current.rightStick.ReadValue() * 4;
+            }
+            else
+            {
+                lookInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            }
+
+            yaw += lookInput.x * player.sensitivity * Time.deltaTime;
+            pitch -= lookInput.y * player.sensitivity * Time.deltaTime;
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
         }
     }
+
 
     void LateUpdate()
     {

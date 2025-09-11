@@ -741,7 +741,7 @@ MonoBehaviour:
   gravity: -20
   firstCamera: {fileID: 330585546}
   thirdCamera: {fileID: 1453073125}
-  mouseSensitivity: 100
+  sensitivity: 100
   groundCheck: {fileID: 1806849599}
   groundDistance: 0.3
   groundMask:
@@ -935,8 +935,6 @@ MonoBehaviour:
   target: {fileID: 1702061798}
   pivotOffset: {x: 0, y: 0.5, z: 0}
   useMouseOrbit: 1
-  mouseXSensitivity: 180
-  mouseYSensitivity: 120
   minPitch: -30
   maxPitch: 70
   defaultDistance: 3.5
@@ -950,6 +948,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   positionSmoothTime: 0.05
   rotationSmoothTime: 0.02
+  player: {fileID: 1074246212}
 --- !u!114 &1453073122
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -14,7 +14,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Câmeras")]
     public Transform firstCamera;
     public Transform thirdCamera;
-    public float mouseSensitivity = 100f;
+    public float sensitivity = 100f;
     private float xRotation = 0f;
 
     [Header("Ground Check")]
@@ -29,6 +29,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Estados")]
     public bool isClimbing = false;
     public bool isThirdPerson = false;
+    public bool isRunToggled = false;
 
     private Animator animator;
     private Transform activeCamera;
@@ -50,6 +51,8 @@ public class PlayerMovement : MonoBehaviour
         Jump();
         ApplyGravity();
         IsPlayerRunning();
+        ToggleRun();
+        ChangeCamera();
     }
 
     private void UpdateActiveCamera()
@@ -99,6 +102,7 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private float speed;
     private void PlayerMove()
     {
         isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
@@ -116,7 +120,8 @@ public class PlayerMovement : MonoBehaviour
             moveInput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
         }
 
-        float speed = (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
+        if (!isRunToggled) 
+            speed = (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
                       (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed)
                       ? runSpeed : walkSpeed;
 
@@ -145,6 +150,24 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void ToggleRun()
+    {
+        if (Gamepad.current != null && Gamepad.current.leftStickButton.wasPressedThisFrame)
+        {
+            isRunToggled = !isRunToggled;
+        }
+
+        if (isRunToggled)
+        {
+            speed = runSpeed;
+            
+        }
+        else
+        {
+            speed = walkSpeed;
+        }
+    }
+
     private void ScreenMovement()
     {
         if (isThirdPerson) return;
@@ -152,15 +175,15 @@ public class PlayerMovement : MonoBehaviour
         Vector2 lookInput = Vector2.zero;
         if (Gamepad.current != null)
         {
-            lookInput = Gamepad.current.rightStick.ReadValue();
+            lookInput = Gamepad.current.rightStick.ReadValue() * 4;
         }
         else
         {
             lookInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
         }
 
-        float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
-        float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
+        float mouseX = lookInput.x * sensitivity * Time.deltaTime;
+        float mouseY = lookInput.y * sensitivity * Time.deltaTime;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 70f);
@@ -191,7 +214,7 @@ public class PlayerMovement : MonoBehaviour
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
         bool isWalking = move.magnitude > 0.1f && isGrounded;
         bool isRunning = ((Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
-                         (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed)) &&
+                         (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed) || isRunToggled) &&
                          isWalking && isGrounded;
 
         animator.SetBool("isRunning", isRunning);
@@ -211,6 +234,49 @@ public class PlayerMovement : MonoBehaviour
         if (other.CompareTag("Stairs"))
         {
             isClimbing = false;
+        }
+    }
+
+    public int currentCam = 1;
+    private void ChangeCamera()
+    {
+        if (Keyboard.current.cKey.wasPressedThisFrame || (Gamepad.current != null && Gamepad.current.rightShoulder.wasPressedThisFrame))
+        {
+            if (currentCam <= 3)
+            {
+                currentCam++;
+            } 
+            
+            if (currentCam >= 4) 
+            {
+                currentCam = 1;
+            }
+
+            CameraMode(currentCam);
+        }
+    }
+
+    private void CameraMode(int mode)
+    {
+        ThirdPersonCamera thirdCam = thirdCamera.gameObject.GetComponent<ThirdPersonCamera>();
+
+        switch (mode) 
+        {
+            case 1:
+                isThirdPerson = true;
+                thirdCam.maxDistance = 3f;
+                thirdCam.currentDistance = 3f;
+                break;
+            case 2:
+                isThirdPerson = true;
+                thirdCam.maxDistance = 6f;
+                thirdCam.currentDistance = 6f;
+                break;
+            case 3:
+                isThirdPerson = false;
+                break;
+            
+
         }
     }
 }
