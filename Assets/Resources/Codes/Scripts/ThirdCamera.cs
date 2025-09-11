@@ -74,7 +74,7 @@ public class ThirdPersonCamera : MonoBehaviour
             }
             else
             {
-                lookInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+                lookInput = new Vector2(Input.GetAxis("CameraHorizontal"), Input.GetAxis("CameraVertical"));
             }
 
             yaw += lookInput.x * player.sensitivity * Time.deltaTime;
@@ -88,30 +88,23 @@ public class ThirdPersonCamera : MonoBehaviour
     {
         if (!target) return;
 
-        // alvo do pivô
         Vector3 pivot = target.position + pivotOffset;
 
-        // rotação alvo e suavização de rotação
         Quaternion desiredRot = Quaternion.Euler(pitch, yaw, 0f);
         currentRot = SmoothDampQuaternion(currentRot, desiredRot, ref rotVel, rotationSmoothTime);
 
-        // direção “para trás” do pivô
-        Vector3 backDir = currentRot * Vector3.back; // equivalente a -(forward)
+        Vector3 backDir = currentRot * Vector3.back; 
 
-        // distância alvo (pode ser encurtada por colisão)
         float desiredDistance = Mathf.Clamp(defaultDistance, minDistance, maxDistance);
         float hitDistance = desiredDistance;
 
-        // SphereCast: do pivô para trás, até a distância desejada
         if (Physics.SphereCast(pivot, sphereRadius, backDir, out RaycastHit hit, desiredDistance, obstructionMask, QueryTriggerInteraction.Ignore))
         {
             hitDistance = Mathf.Clamp(hit.distance - clipPushback, minDistance, desiredDistance);
         }
 
-        // suaviza ir/voltar
         currentDistance = Mathf.SmoothDamp(currentDistance, hitDistance, ref distVel, positionSmoothTime);
 
-        // aplica posição e rotação
         Vector3 camPos = pivot + backDir * currentDistance;
         transform.SetPositionAndRotation(camPos, currentRot);
     }
@@ -119,27 +112,22 @@ public class ThirdPersonCamera : MonoBehaviour
     // ---------- utils ----------
     float NormalizePitch(float x)
     {
-        // converte 0..360 para -180..180 e clampa depois em Update
         if (x > 180f) x -= 360f;
         return x;
     }
 
-    // Suavização de quaternions (sem alocar)
     Quaternion SmoothDampQuaternion(Quaternion current, Quaternion target, ref Quaternion deriv, float time)
     {
         if (time <= 0f) return target;
 
-        // garante o caminho mais curto
         if (Quaternion.Dot(current, target) < 0f)
         {
             target = new Quaternion(-target.x, -target.y, -target.z, -target.w);
         }
 
-        // converte para Vector4 pra poder usar SmoothDamp
         Vector4 c = new Vector4(current.x, current.y, current.z, current.w);
         Vector4 t = new Vector4(target.x, target.y, target.z, target.w);
 
-        // suaviza cada componente
         Vector4 result = new Vector4(
             Mathf.SmoothDamp(c.x, t.x, ref deriv.x, time),
             Mathf.SmoothDamp(c.y, t.y, ref deriv.y, time),
@@ -147,7 +135,6 @@ public class ThirdPersonCamera : MonoBehaviour
             Mathf.SmoothDamp(c.w, t.w, ref deriv.w, time)
         ).normalized;
 
-        // basta retornar o Quaternion, sem recalcular deriv
         return new Quaternion(result.x, result.y, result.z, result.w);
     }
 

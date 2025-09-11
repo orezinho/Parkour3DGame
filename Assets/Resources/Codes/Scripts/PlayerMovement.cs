@@ -179,7 +179,7 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            lookInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            lookInput = new Vector2(Input.GetAxis("CameraHorizontal"), Input.GetAxis("CameraVertical"));
         }
 
         float mouseX = lookInput.x * sensitivity * Time.deltaTime;
@@ -263,16 +263,20 @@ public class PlayerMovement : MonoBehaviour
         switch (mode) 
         {
             case 1:
-                isThirdPerson = true;
+                firstCamera.rotation = thirdCamera.transform.rotation;
+                thirdCam.defaultDistance = 3f;
                 thirdCam.maxDistance = 3f;
                 thirdCam.currentDistance = 3f;
+                isThirdPerson = true;
                 break;
             case 2:
-                isThirdPerson = true;
+                thirdCam.defaultDistance = 6f;
                 thirdCam.maxDistance = 6f;
                 thirdCam.currentDistance = 6f;
+                isThirdPerson = true;
                 break;
             case 3:
+                thirdCamera.rotation = firstCamera.rotation;
                 isThirdPerson = false;
                 break;
             
