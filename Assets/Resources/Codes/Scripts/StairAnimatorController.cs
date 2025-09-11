@@ -33,7 +33,7 @@ public class StairClimbing : MonoBehaviour
 
             velocity.y = verticalInput * climbSpeed;
 
-            animator.speed = Mathf.Abs(verticalInput) > 0.1f ? 1f : 0f;
+            animator.speed = Mathf.Abs(verticalInput) > 0.1f ? 2f : 0f;
 
             animator.SetBool("isClimbing", true);
         }
