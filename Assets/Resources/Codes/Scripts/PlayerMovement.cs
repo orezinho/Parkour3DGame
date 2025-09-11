@@ -1,19 +1,23 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
+    [Header("Velocidades")]
     public float walkSpeed = 5f;
     public float runSpeed = 8f;
     public float jumpHeight = 2f;
     public float gravity = -9.81f;
-    public float fallMultiplier = 2.5f;
 
-    public Transform playerCamera;
+    [Header("Câmeras")]
+    public Transform firstCamera;
+    public Transform thirdCamera;
     public float mouseSensitivity = 100f;
     private float xRotation = 0f;
 
+    [Header("Ground Check")]
     public Transform groundCheck;
     public float groundDistance = 0.3f;
     public LayerMask groundMask;
@@ -22,9 +26,12 @@ public class PlayerMovement : MonoBehaviour
     public Vector3 velocity;
     private bool isGrounded;
 
+    [Header("Estados")]
     public bool isClimbing = false;
+    public bool isThirdPerson = false;
 
     private Animator animator;
+    private Transform activeCamera;
 
     void Start()
     {
@@ -32,10 +39,12 @@ public class PlayerMovement : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
         animator = GetComponentInChildren<Animator>();
+        UpdateActiveCamera();
     }
 
     void Update()
     {
+        UpdateActiveCamera();
         ScreenMovement();
         PlayerMove();
         Jump();
@@ -43,21 +52,37 @@ public class PlayerMovement : MonoBehaviour
         IsPlayerRunning();
     }
 
+    private void UpdateActiveCamera()
+    {
+        if (isThirdPerson)
+        {
+            activeCamera = thirdCamera;
+            thirdCamera.gameObject.SetActive(true);
+            firstCamera.gameObject.SetActive(false);
+        }
+        else
+        {
+            activeCamera = firstCamera;
+            firstCamera.gameObject.SetActive(true);
+            thirdCamera.gameObject.SetActive(false);
+        }
+    }
+
     private void Jump()
     {
-        if (isClimbing && Input.GetButtonDown("Jump"))
+        if (isClimbing && (Keyboard.current.spaceKey.wasPressedThisFrame || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)))
         {
             StartCoroutine(ExitLadder());
             isClimbing = false;
             return;
         }
 
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if ((Keyboard.current.spaceKey.wasPressedThisFrame || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)) && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
             animator.SetTrigger("Jump");
         }
-         
+
         animator.SetBool("isGrounded", isGrounded);
     }
 
@@ -81,23 +106,66 @@ public class PlayerMovement : MonoBehaviour
 
         if (isClimbing) return;
 
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        Vector2 moveInput = Vector2.zero;
+        if (Gamepad.current != null)
+        {
+            moveInput = Gamepad.current.leftStick.ReadValue();
+        }
+        else
+        {
+            moveInput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+        }
 
-        Vector3 move = transform.right * x + transform.forward * z;
-        float speed = Input.GetKey(KeyCode.LeftShift) ? runSpeed : walkSpeed;
-        controller.Move(move * speed * Time.deltaTime);
+        float speed = (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
+                      (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed)
+                      ? runSpeed : walkSpeed;
+
+        if (isThirdPerson)
+        {
+            Vector3 camForward = activeCamera.forward;
+            Vector3 camRight = activeCamera.right;
+            camForward.y = 0f;
+            camRight.y = 0f;
+            camForward.Normalize();
+            camRight.Normalize();
+
+            Vector3 move = camRight * moveInput.x + camForward * moveInput.y;
+
+            if (move.sqrMagnitude > 0.01f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(move, Vector3.up);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+                controller.Move(move.normalized * speed * Time.deltaTime);
+            }
+        }
+        else
+        {
+            Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
+            controller.Move(move * speed * Time.deltaTime);
+        }
     }
 
     private void ScreenMovement()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+        if (isThirdPerson) return;
+
+        Vector2 lookInput = Vector2.zero;
+        if (Gamepad.current != null)
+        {
+            lookInput = Gamepad.current.rightStick.ReadValue();
+        }
+        else
+        {
+            lookInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+        }
+
+        float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
+        float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 70f);
 
-        playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        firstCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         transform.Rotate(Vector3.up * mouseX);
     }
 
@@ -110,13 +178,21 @@ public class PlayerMovement : MonoBehaviour
 
     private void IsPlayerRunning()
     {
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        Vector2 moveInput = Vector2.zero;
+        if (Gamepad.current != null)
+        {
+            moveInput = Gamepad.current.leftStick.ReadValue();
+        }
+        else
+        {
+            moveInput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+        }
 
-        Vector3 move = transform.right * x + transform.forward * z;
-
+        Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
         bool isWalking = move.magnitude > 0.1f && isGrounded;
-        bool isRunning = Input.GetKey(KeyCode.LeftShift) && isWalking && isGrounded;
+        bool isRunning = ((Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
+                         (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed)) &&
+                         isWalking && isGrounded;
 
         animator.SetBool("isRunning", isRunning);
         animator.SetBool("isWalking", isWalking && !isRunning);
@@ -124,7 +200,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Stairs")) 
+        if (other.CompareTag("Stairs"))
         {
             isClimbing = true;
         }
@@ -137,7 +213,4 @@ public class PlayerMovement : MonoBehaviour
             isClimbing = false;
         }
     }
-
 }
-
-
