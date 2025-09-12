@@ -1,7 +1,8 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class ThirdPersonCamera : MonoBehaviour
+public class ThirdPersonCamera : NetworkBehaviour
 {
     [Header("Alvo / Pivot")]
     public Transform target;                
@@ -36,6 +37,8 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void Start()
     {
+        if (!IsOwner) return;
+
         if (!target)
         {
             Debug.LogWarning("ThirdPersonCameraCollision: atribua o Target no Inspector.");
@@ -57,6 +60,8 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void Update()
     {
+        if (!IsOwner) return;
+
         // Zoom
         float scroll = Input.mouseScrollDelta.y;
         if (Mathf.Abs(scroll) > 0.0001f)
@@ -86,6 +91,8 @@ public class ThirdPersonCamera : MonoBehaviour
 
     void LateUpdate()
     {
+        if (!IsOwner) return;
+
         if (!target) return;
 
         Vector3 pivot = target.position + pivotOffset;

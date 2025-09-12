@@ -1,94 +1,174 @@
-using PlayFab;
+﻿using PlayFab;
+using PlayFab.ClientModels;
 using PlayFab.MultiplayerModels;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 
-public class PlayFabLobbyManager : MonoBehaviour
+public class PlayFabLobbySystem : MonoBehaviour
 {
     [Header("UI")]
-    public Transform lobbyListContainer; // Content do ScrollView
-    public GameObject lobbyButtonPrefab; // Prefab do bot�o
+    public Transform lobbyListContainer;   // Content do ScrollView
+    public GameObject lobbyButtonPrefab;   // Prefab do botão
+    public TextMeshProUGUI statusText;     // Status na tela
 
+    private static PlayFab.MultiplayerModels.EntityKey myEntityKey;
+    private string currentConnectionString;
     private string currentLobbyId;
-    private List<LobbySummary> lobbyList = new List<LobbySummary>();
 
-    // Cria um lobby
+    // 1) Login
+    void Start()
+    {
+        var req = new LoginWithCustomIDRequest
+        {
+            CustomId = System.Guid.NewGuid().ToString(),
+            CreateAccount = true
+        };
+        PlayFabClientAPI.LoginWithCustomID(req, OnLoginSuccess, OnLoginFailure);
+
+        
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            CreateLobby();
+        }
+
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            ListLobbies();
+        }
+    }
+
+
+
+    void OnLoginSuccess(LoginResult res)
+    {
+        statusText.text = "Login feito!";
+        myEntityKey = new PlayFab.MultiplayerModels.EntityKey
+        {
+            Id = res.EntityToken.Entity.Id,
+            Type = res.EntityToken.Entity.Type
+        };
+    }
+
+    void OnLoginFailure(PlayFabError err)
+    {
+        statusText.text = "Erro no login!";
+        Debug.LogError(err.GenerateErrorReport());
+    }
+
+    // 2) Criar lobby -> Host
     public void CreateLobby()
     {
-        var request = new CreateLobbyRequest
+        string lobbyName = "Sala_" + Random.Range(1000, 9999);
+
+        var req = new CreateLobbyRequest
         {
-            MaxPlayers = 7,
-            Owner = System.Guid.NewGuid().ToString(),
-            LobbyName = "Sala_" + Random.Range(1000, 9999)
+            MaxPlayers = 2,
+            Owner = myEntityKey,
+            AccessPolicy = AccessPolicy.Public,
+            Members = new List<Member> { new Member { MemberEntity = myEntityKey } },
+            // Nome pesquisável vai em SearchData (string_keyN)
+            SearchData = new Dictionary<string, string> { { "string_key1", lobbyName } }
         };
 
-        PlayFabMultiplayerAPI.CreateLobby(request, OnLobbyCreated, OnError);
+        PlayFabMultiplayerAPI.CreateLobby(req, OnLobbyCreated, OnError);
     }
 
-    // Lista lobbies e gera UI
+    void OnLobbyCreated(CreateLobbyResult res)
+    {
+        currentConnectionString = res.ConnectionString; // top-level no Create
+        currentLobbyId = res.LobbyId;
+
+        statusText.text = "Lobby criado!";
+        Debug.Log($"Lobby criado. Id={currentLobbyId}, ConnStr={currentConnectionString}");
+
+        // Vira HOST
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        transport.ConnectionData.Address = "0.0.0.0"; // aceitar conexões
+        transport.ConnectionData.Port = 7777;
+        NetworkManager.Singleton.StartHost();
+    }
+
+    // 3) Listar lobbies
     public void ListLobbies()
     {
-        var request = new FindLobbiesRequest
+        var req = new FindLobbiesRequest
         {
-            Filter = "lobbyName ne null",
-            OrderBy = "lobbyName asc"
+            Filter = "lobby/memberCountRemaining gt 0",
+            OrderBy = "lobby/memberCountRemaining desc"
         };
-
-        PlayFabMultiplayerAPI.FindLobbies(request, OnLobbiesFound, OnError);
+        PlayFabMultiplayerAPI.FindLobbies(req, OnLobbiesFound, OnError);
     }
 
-    private void OnLobbiesFound(FindLobbiesResult result)
+    void OnLobbiesFound(FindLobbiesResult res)
     {
-        // limpa a lista antiga
-        foreach (Transform child in lobbyListContainer)
+        foreach (Transform c in lobbyListContainer) Destroy(c.gameObject);
+
+        foreach (var lobby in res.Lobbies)
         {
-            Destroy(child.gameObject);
+            var go = Instantiate(lobbyButtonPrefab, lobbyListContainer);
+
+            string lobbyName = (lobby.SearchData != null &&
+                                lobby.SearchData.TryGetValue("string_key1", out var name))
+                               ? name : $"Lobby {lobby.LobbyId.Substring(0, 6)}";
+
+            go.GetComponentInChildren<TMP_Text>().text =
+                $"{lobbyName} ({lobby.CurrentPlayers}/{lobby.MaxPlayers})";
+
+            string connectionString = lobby.ConnectionString; // é isso que se usa p/ Join
+            go.GetComponent<Button>().onClick.AddListener(() => JoinLobby(connectionString));
         }
 
-        lobbyList = result.Lobbies;
-        Debug.Log("?? Lobbies encontrados: " + lobbyList.Count);
-
-        foreach (var lobby in lobbyList)
-        {
-            GameObject newButton = Instantiate(lobbyButtonPrefab, lobbyListContainer);
-
-            // atualiza o texto
-            TMP_Text buttonText = newButton.GetComponentInChildren<TMP_Text>();
-            buttonText.text = $"{lobby.LobbyName} ({lobby.CurrentPlayers}/{lobby.MaxPlayers})";
-
-            // adiciona evento para entrar no lobby
-            Button btn = newButton.GetComponent<Button>();
-            string targetLobbyId = lobby.LobbyId; // precisa copiar a vari�vel
-            btn.onClick.AddListener(() => JoinLobby(targetLobbyId));
-        }
+        statusText.text = "Lobbies carregados!";
     }
 
-    // Entra no lobby
-    public void JoinLobby(string lobbyId)
+    // 4) Entrar no lobby -> JoinLobby usa ConnectionString
+    public void JoinLobby(string connectionString)
     {
-        var request = new JoinLobbyRequest
+        var req = new JoinLobbyRequest
         {
-            LobbyId = lobbyId
+            ConnectionString = connectionString,
+            MemberEntity = myEntityKey
         };
 
-        PlayFabMultiplayerAPI.JoinLobby(request, OnLobbyJoined, OnError);
+        PlayFabMultiplayerAPI.JoinLobby(req, OnLobbyJoined, OnError);
     }
 
-    private void OnLobbyCreated(CreateLobbyResult result)
+    // JoinLobbyResult NÃO tem Lobby completo; usa LobbyId p/ GetLobby
+    void OnLobbyJoined(JoinLobbyResult res)
     {
-        currentLobbyId = result.LobbyId;
-        Debug.Log("? Lobby criado com sucesso! ID: " + currentLobbyId);
+        currentLobbyId = res.LobbyId;
+        statusText.text = "Entrou no lobby, buscando dados...";
+
+        var getReq = new GetLobbyRequest { LobbyId = currentLobbyId };
+        PlayFabMultiplayerAPI.GetLobby(getReq, OnGetLobby, OnError);
     }
 
-    private void OnLobbyJoined(JoinLobbyResult result)
+    // 5) GetLobby -> agora sim temos Lobby.ConnectionString
+    void OnGetLobby(GetLobbyResult res)
     {
-        currentLobbyId = result.LobbyId;
-        Debug.Log("? Entrou no lobby: " + currentLobbyId);
+        currentConnectionString = res.Lobby.ConnectionString;
+        statusText.text = "Lobby conectado!";
+        Debug.Log($"GetLobby OK. Id={currentLobbyId}, ConnStr={currentConnectionString}");
+
+        // Vira CLIENT
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        transport.ConnectionData.Address = "127.0.0.1"; // provisório (LAN)
+        transport.ConnectionData.Port = 7777;
+        NetworkManager.Singleton.StartClient();
     }
 
-    private void OnError(PlayFabError error)
+    // Erros
+    void OnError(PlayFabError err)
     {
-        Debug.LogError("? Erro: " + error.GenerateErrorReport());
+        statusText.text = "Erro: " + err.ErrorMessage;
+        Debug.LogError(err.GenerateErrorReport());
     }
 }

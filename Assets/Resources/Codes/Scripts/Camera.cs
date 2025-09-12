@@ -1,6 +1,7 @@
+using Unity.Netcode;
 using UnityEngine;
 
-public class FirstCamera : MonoBehaviour
+public class FirstCamera : NetworkBehaviour
 {
     public Transform headBone;
     public Transform cam;        
@@ -18,6 +19,7 @@ public class FirstCamera : MonoBehaviour
 
     void LateUpdate()
     {
+
         Vector3 targetPos = headBone.position;
         Quaternion targetRot = headBone.rotation;
 
